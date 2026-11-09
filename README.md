@@ -5,12 +5,17 @@
 Compare the expression of the same gene modules (e.g. housekeeping, T cell, myeloid) across several Seurat objects from **human and mouse**, side by side, in one figure. Gene symbols are mapped between species through an ortholog table computed once, so the rows of every heatmap are the same genes in the same order.
 
 <!--
+This is how you comment out your code
+-->
+
 Add your own figures in man/figures/ and uncomment:
 <p align="center">
-  <img src="man/figures/example_A.png" width="45%">
-  <img src="man/figures/example_C.png" width="45%">
+  <img src="man/figures/Test_heatmap_A.png" width="45%">
+  <img src="man/figures/Test_heatmap_B.png" width="45%">
+  <img src="man/figures/Test_heatmap_C.png" width="45%">
+  <img src="man/figures/Test PNG.png" width="45%">
 </p>
--->
+
 
 ## Features
 
