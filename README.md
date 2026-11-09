@@ -8,7 +8,6 @@ Compare the expression of the same gene modules (e.g. housekeeping, T cell, myel
 This is how you comment out your code
 -->
 
-Add your own figures in man/figures/ and uncomment:
 <p align="center">
   <img src="man/figures/Test_heatmap_A.png" width="45%">
   <img src="man/figures/Test_heatmap_B.png" width="45%">
