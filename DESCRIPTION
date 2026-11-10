@@ -1,6 +1,6 @@
 Package: CrossHeat
 Title: Cross-Species Heatmaps of Gene Modules from Single-Cell Data
-Version: 0.1.0
+Version: 0.1.2
 Authors@R: 
     person("Yann", "Tapponnier", email = "Yann.tapponnier@gmail.com", role = c("aut", "cre"))
 Description: Draws side-by-side heatmaps of the same gene modules across several
