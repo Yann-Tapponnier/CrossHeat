@@ -3,6 +3,6 @@
 .RData
 .Ruserdata
 .DS_Store
-figures/
+/figures/
 *.rds
 TODO_perso.md
