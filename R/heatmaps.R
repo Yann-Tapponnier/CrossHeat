@@ -25,6 +25,16 @@
 #'     is saved (e.g. `"map_orthologues.rds"`); `NULL` = no saving.}
 #' }
 #'
+#' **Missing genes**
+#' \describe{
+#'   \item{`keep_missing`}{Default `FALSE`: only the genes present in **all** datasets are
+#'     drawn (the dropped genes are listed in the console). `TRUE`: keep every gene of
+#'     `genesets`; in a dataset where a gene is absent (or has no ortholog) its row is
+#'     entirely `na_color` (grey) and its bar is 0. The genes concerned are listed in the
+#'     console. If you change `keep_missing`, do not reuse `out$map` from a previous call:
+#'     let the table be recomputed.}
+#' }
+#'
 #' **Transformation**
 #' \describe{
 #'   \item{`clip`}{Default `2`. Clipping of the per-gene z-score to `[-clip, clip]`;
@@ -94,6 +104,8 @@ default_params <- function() list(
   ortho_non121   = "keep_both_species",  # stratégie orthogene pour les orthologues non 1:1
   human_to_mouse = TRUE,
   map_file       = NULL,              # ex. "map_orthologues.rds" pour sauvegarder la table
+  # gènes manquants
+  keep_missing   = FALSE,             # TRUE : garder les gènes absents d'un dataset (ligne grise)
   # transformation
   clip           = 2,                 # écrêtage du z-score ; NULL = pas d'écrêtage
   min_n          = 10,                # B/C : nb min de cellules exprimant le gène dans un groupe
@@ -138,8 +150,10 @@ sym_of <- function(species) if (species == "human") "gene_human" else "gene_mous
 #' If the datasets are of different species, calls [Orthologue_Table()] to map
 #' the gene symbols. If **all datasets have the same species**, no conversion is
 #' done: the gene sets are used as given and must be symbols of that species.
-#' In both cases only the genes present in **all** datasets are kept. The
-#' resulting table defines the row order of every heatmap.
+#' By default only the genes present in **all** datasets are kept; with
+#' `keep_missing = TRUE` (see [default_params()]) every gene is kept and the
+#' missing ones are drawn as grey rows. The resulting table defines the row
+#' order of every heatmap.
 #'
 #' @param genesets Named list of gene symbols, one vector per module. Human
 #'   symbols when the datasets mix species (see `human_to_mouse` in
@@ -168,18 +182,51 @@ prepare_map <- function(genesets, datasets, P = default_params()) {
     map <- Orthologue_Table(genesets, Method = P$ortho_method,
                             human_to_mouse = P$human_to_mouse,
                             non121_strategy = P$ortho_non121)
+
+    if (isTRUE(P$keep_missing)) {
+      # gènes sans ortholog : Orthologue_Table() les perd, on les remet (NA dans l'autre espèce)
+      from <- if (P$human_to_mouse) "human" else "mouse"
+      to   <- if (P$human_to_mouse) "mouse" else "human"
+      st   <- unique(stack(genesets))
+      lost <- st[!as.character(st$values) %in% map[[paste0("gene_", from)]], , drop = FALSE]
+      if (nrow(lost)) {
+        add <- data.frame(a = as.character(lost$values),
+                          b = factor(as.character(lost$ind), levels = names(genesets)),
+                          c = NA_character_, stringsAsFactors = FALSE)
+        names(add) <- c(paste0("gene_", from), "module", paste0("gene_", to))
+        map <- rbind(map, add[, names(map), drop = FALSE])
+      }
+      # ordre = ordre des genesets
+      map <- map[order(map$module, match(map[[paste0("gene_", from)]], unlist(genesets))), ]
+      rownames(map) <- NULL
+    }
   }
   if (!is.null(P$map_file)) saveRDS(map, P$map_file)
   print(map)
 
-  # lignes dont le gène existe dans TOUS les datasets
-  keep <- Reduce(`&`, lapply(datasets, function(d)
-                             map[[sym_of(d$species)]] %in% rownames(d$obj)))
-  message("Genes dropped (missing in at least one dataset):"); print(map[!keep, ])
-  map <- map[keep, , drop = FALSE]
+  # présence de chaque gène dans chaque dataset (NA = pas d'ortholog = absent)
+  present <- lapply(datasets, function(d) {
+    g <- map[[sym_of(d$species)]]
+    !is.na(g) & g %in% rownames(d$obj)
+  })
+  everywhere <- Reduce(`&`, present)
+
+  if (isTRUE(P$keep_missing)) {
+    # on garde tout ; les lignes absentes d'un dataset seront grises
+    message("Genes kept but missing in at least one dataset (grey rows there):")
+    print(map[!everywhere, ])
+  } else {
+    # on garde seulement les gènes présents dans TOUS les datasets
+    message("Genes dropped (missing in at least one dataset):"); print(map[!everywhere, ])
+    map <- map[everywhere, , drop = FALSE]
+  }
+
   map$module <- factor(map$module, levels = names(genesets))
   lab_col <- if ("gene_human" %in% names(map)) "gene_human" else "gene_mouse"
-  map$label  <- make.unique(map[[lab_col]])   # étiquettes de lignes
+  lab <- map[[lab_col]]
+  other <- setdiff(intersect(c("gene_human", "gene_mouse"), names(map)), lab_col)
+  if (anyNA(lab) && length(other)) lab[is.na(lab)] <- map[[other]][is.na(lab)]
+  map$label <- make.unique(lab)               # étiquettes de lignes
   map                                         # définit l'ordre des lignes pour tous les datasets
 }
 
@@ -190,17 +237,21 @@ prepare_map <- function(genesets, datasets, P = default_params()) {
 #' @noRd
 extract_cells <- function(d, map, n_cells = 200, seed = 1) {
   g    <- map[[sym_of(d$species)]]
+  ok   <- !is.na(g) & g %in% rownames(d$obj)      # gène présent dans ce dataset
   grp  <- d$obj@meta.data[[d$grp]]
-  expr <- GetAssayData(d$obj, layer = "data")[unique(g), , drop = FALSE]
+  expr <- GetAssayData(d$obj, layer = "data")[unique(g[ok]), , drop = FALSE]
 
-  # nb de cellules exprimant le gène sur TOUT le dataset (pas seulement le tirage)
-  n_total <- Matrix::rowSums(expr > 0)[g]
+  # nb de cellules exprimant le gène sur TOUT le dataset (pas seulement le tirage) ; 0 si absent
+  n_total <- numeric(length(g))
+  n_total[ok] <- Matrix::rowSums(expr > 0)[g[ok]]
 
   set.seed(seed)
   cells <- unlist(lapply(split(colnames(d$obj), grp),
                          \(x) sample(x, min(n_cells, length(x)))))
-  mat <- as.matrix(expr[, cells, drop = FALSE])[g, , drop = FALSE]
-  rownames(mat) <- map$label
+  # gènes absents : ligne entière à NA (case grise)
+  mat <- matrix(NA_real_, nrow = length(g), ncol = length(cells),
+                dimnames = list(map$label, cells))
+  if (any(ok)) mat[ok, ] <- as.matrix(expr[, cells, drop = FALSE])[g[ok], , drop = FALSE]
 
   g_cells <- as.character(grp[match(cells, colnames(d$obj))])
   list(mat = mat,
@@ -212,23 +263,31 @@ extract_cells <- function(d, map, n_cells = 200, seed = 1) {
 #' @noRd
 extract_avg <- function(d, map, min_n = 10) {
   g    <- map[[sym_of(d$species)]]
+  ok   <- !is.na(g) & g %in% rownames(d$obj)      # gène présent dans ce dataset
   grp  <- d$obj@meta.data[[d$grp]]
-  expr <- GetAssayData(d$obj, layer = "data")[unique(g), , drop = FALSE]
+  expr <- GetAssayData(d$obj, layer = "data")[unique(g[ok]), , drop = FALSE]
   idx  <- split(seq_along(grp), grp)
 
-  # moyenne en espace non-log (comme AverageExpression), puis log1p
-  avg    <- sapply(idx, \(i) Matrix::rowMeans(expm1(expr[, i, drop = FALSE])))
-  n_expr <- sapply(idx, \(i) Matrix::rowSums(expr[, i, drop = FALSE] > 0))
-  avg    <- log1p(avg)
+  # gènes absents : ligne entière à NA (case grise), 0 cellule
+  avg    <- matrix(NA_real_, nrow = length(g), ncol = length(idx),
+                   dimnames = list(map$label, names(idx)))
+  n_expr <- matrix(0, nrow = length(g), ncol = length(idx),
+                   dimnames = list(map$label, names(idx)))
+  n_total <- numeric(length(g))
 
-  avg    <- avg[g, , drop = FALSE]
-  n_expr <- n_expr[g, , drop = FALSE]
-  rownames(avg) <- rownames(n_expr) <- map$label
+  if (any(ok)) {
+    # moyenne en espace non-log (comme AverageExpression), puis log1p
+    a <- sapply(idx, \(i) Matrix::rowMeans(expm1(expr[, i, drop = FALSE])))
+    n <- sapply(idx, \(i) Matrix::rowSums(expr[, i, drop = FALSE] > 0))
+    a <- log1p(a)
+    avg[ok, ]    <- a[g[ok], , drop = FALSE]
+    n_expr[ok, ] <- n[g[ok], , drop = FALSE]
+    n_total[ok]  <- Matrix::rowSums(expr > 0)[g[ok]]
+  }
 
   avg[n_expr < min_n] <- NA          # trop peu de cellules positives -> case grise
 
-  list(mat = avg, group = NULL, n_expr = n_expr,
-       n_total = unname(Matrix::rowSums(expr > 0)[g]))
+  list(mat = avg, group = NULL, n_expr = n_expr, n_total = n_total)
 }
 
 ###############################################################################
@@ -473,6 +532,11 @@ build <- function(extract, transform, datasets, map, P, version_label,
 #' out2 <- run_heatmaps(datasets, genesets,
 #'                      params = list(versions = "B", save_png = TRUE),
 #'                      map = out$map)
+#'
+#' # Keep ALL genes, even those missing in a dataset (grey rows there).
+#' # No `map = out$map` here: the gene table must be recomputed.
+#' out3 <- run_heatmaps(datasets, genesets,
+#'                      params = list(keep_missing = TRUE, min_n = 0))
 #'
 #' # One species only (here a single mouse dataset): no ortholog conversion,
 #' # genesets are MOUSE symbols

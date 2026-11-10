@@ -5,16 +5,12 @@
 Compare the expression of the same gene modules (e.g. housekeeping, T cell, myeloid) across several Seurat objects from **human and mouse**, side by side, in one figure. Gene symbols are mapped between species through an ortholog table computed once, so the rows of every heatmap are the same genes in the same order.
 
 <!--
-This is how you comment out your code
--->
-
+Add your own figures in man/figures/ and uncomment:
 <p align="center">
-  <img src="man/figures/Test_heatmap_A.png" width="45%">
-  <img src="man/figures/Test_heatmap_B.png" width="45%">
-  <img src="man/figures/Test_heatmap_C.png" width="45%">
-  <img src="man/figures/Test PNG.png" width="45%">
+  <img src="man/figures/example_A.png" width="45%">
+  <img src="man/figures/example_C.png" width="45%">
 </p>
-
+-->
 
 ## Features
 
@@ -29,7 +25,7 @@ This is how you comment out your code
 
 - Per-gene z-score with optional **clipping** (`clip`).
 - Optional horizontal bar plot of the number of expressing cells (views A and B).
-- Genes missing in at least one dataset are dropped and listed.
+- Genes missing in at least one dataset are dropped and listed, or kept as **grey rows** with `keep_missing = TRUE`.
 - **Flexible layout** (`flexible = TRUE`): the blocks stretch with the plot window.
 - **Custom colours** for the heatmap (`colors`, `na_color`, `bar_color`) and optional coloured **tiles** per module (side) and per group (top).
 - **No ortholog conversion** when all datasets have the same species (including a single dataset).
@@ -128,6 +124,7 @@ Defaults are shown; also available with `default_params()` and `?default_params`
 | `ortho_non121` | `"keep_both_species"` | orthologs | how non one-to-one orthologs are handled (`non121_strategy` of `orthogene`) |
 | `human_to_mouse` | `TRUE` | orthologs | `TRUE` if `genesets` are human symbols, `FALSE` if mouse (ignored when all datasets share one species) |
 | `map_file` | `NULL` | orthologs | `.rds` path to save the ortholog table, `NULL` = no saving |
+| `keep_missing` | `FALSE` | all | `FALSE`: only genes present in all datasets are drawn; `TRUE`: keep every gene, with an all-grey row (and a 0 bar) in the datasets where it is missing or has no ortholog. Do not reuse `out$map` when you change it |
 | `clip` | `2` | all | z-score clipped to `[-clip, clip]`, `NULL` = none; also sets the colour scale limits |
 | `min_n` | `10` | B, C | minimum number of cells expressing a gene in a group, otherwise grey tile |
 | `n_cells` | `200` | A | cells sampled per group |
@@ -157,7 +154,7 @@ Defaults are shown; also available with `default_params()` and `?default_params`
 
 ## Notes and limits
 
-- When datasets mix species, gene sets are given as **human** symbols. Genes without a mouse ortholog, or absent from one dataset, are dropped and printed.
+- When datasets mix species, gene sets are given as **human** symbols. Genes without a mouse ortholog, or absent from one dataset, are dropped and printed, unless `keep_missing = TRUE` (grey rows). With `keep_missing = TRUE`, recompute the gene table (do not pass `map = out$map` from a previous run) and consider `min_n = 0` so that no tile is masked.
 - When **all datasets have the same species** (even a single one), nothing is converted: `genesets` must then be symbols of that species (e.g. `Cd3e` for mouse). Genes absent from a dataset are dropped and printed.
 - Cell types or states defined in one species do not always map one-to-one onto the other species; interpret cross-species comparisons with care.
 - Scores in view C are the mean of the clipped z-scores, which assumes each gene contributes equally. A rank-based score such as [UCell](https://github.com/carmonalab/UCell) could replace `module_score()`.
