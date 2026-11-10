@@ -8,10 +8,10 @@ Compare the expression of the same gene modules (e.g. housekeeping, T cell, myel
 -->
 
 <p align="center">
+  <img src="man/figures/test_1.png" width="45%">
   <img src="man/figures/Test_heatmap_A.png" width="45%">
   <img src="man/figures/Test_heatmap_B.png" width="45%">
   <img src="man/figures/Test_heatmap_C.png" width="45%">
-  <img src="man/figures/test_1.png" width="45%">
 </p>
 
 
