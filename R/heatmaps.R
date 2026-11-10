@@ -10,7 +10,7 @@
 #'   \item{`versions`}{Default `c("A", "B", "C")`. Views to draw, any combination:
 #'     `"A"` genes x cells, `"B"` genes x groups, `"C"` modules x groups.}
 #' }
-#'
+#' 
 #' **Orthologs** (used only when the datasets are of different species and `map`
 #' is not supplied to [run_heatmaps()]; if all datasets have the same species no
 #' conversion is done)
