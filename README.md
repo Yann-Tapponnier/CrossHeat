@@ -4,16 +4,12 @@
 
 Compare the expression of the same gene modules (e.g. housekeeping, T cell, myeloid) across several Seurat objects from **human and mouse**, side by side, in one figure. Gene symbols are mapped between species through an ortholog table computed once, so the rows of every heatmap are the same genes in the same order.
 
-<!--
--->
-
 <p align="center">
   <img src="man/figures/test_1.png" width="45%">
   <img src="man/figures/Test_heatmap_A.png" width="45%">
   <img src="man/figures/Test_heatmap_B.png" width="45%">
   <img src="man/figures/Test_heatmap_C.png" width="45%">
 </p>
-
 
 ## Features
 
@@ -25,6 +21,7 @@ Compare the expression of the same gene modules (e.g. housekeeping, T cell, myel
   | **A** | genes | cells | random sample of cells per group, group names under each block |
   | **B** | genes | groups | average expression, **grey tile** if fewer than `min_n` cells express the gene |
   | **C** | modules | groups | mean z-score of the genes of each module |
+  | **D** | genes | groups | **dot plot**: colour = scaled mean, dot size = fraction of cells expressing the gene |
 
 - Per-gene z-score with optional **clipping** (`clip`).
 - Optional horizontal bar plot of the number of expressing cells (views A and B).
@@ -82,7 +79,13 @@ out3 <- run_heatmaps(datasets, genesets,
                           group_colors = c(ctrl = "grey60", treated = "firebrick")),
                      map = out$map)
 
-# 6. One species only: no ortholog conversion (genesets = symbols of that species)
+# 6. Dot plot (view D): colour = scaled mean, dot size = fraction of cells expressing the gene
+run_heatmaps(datasets, genesets,
+             list(versions = "D", colors = "dotplot", color_range = c(-1, 3),
+                  clip = 3, min_n = 0),
+             map = out$map)
+
+# 7. One species only: no ortholog conversion (genesets = symbols of that species)
 run_heatmaps(list(Dataset2_mouse = datasets$Dataset2_mouse),
              list(Module2_T_cell = c("Cd3d", "Cd3e", "Cd2")))
 ```
@@ -122,7 +125,7 @@ Defaults are shown; also available with `default_params()` and `?default_params`
 
 | Parameter | Default | Used by | Description |
 |-----------|---------|---------|-------------|
-| `versions` | `c("A","B","C")` | all | views to draw: `"A"` genes x cells, `"B"` genes x groups, `"C"` modules x groups; any combination |
+| `versions` | `c("A","B","C")` | all | views to draw: `"A"` genes x cells, `"B"` genes x groups, `"C"` modules x groups, `"D"` dot plot; any combination |
 | `ortho_method` | `"gprofiler"` | orthologs | `"gprofiler"`, `"homologene"` or `"babelgene"` |
 | `ortho_non121` | `"keep_both_species"` | orthologs | how non one-to-one orthologs are handled (`non121_strategy` of `orthogene`) |
 | `human_to_mouse` | `TRUE` | orthologs | `TRUE` if `genesets` are human symbols, `FALSE` if mouse (ignored when all datasets share one species) |
@@ -140,7 +143,10 @@ Defaults are shown; also available with `default_params()` and `?default_params`
 | `col_w` | `8` | B, C | width of one column, in mm (when `flexible = FALSE`) |
 | `gene_size` | `8` | all | font size of the gene names (rows) |
 | `col_size` | `9` | all | font size of column names (B, C) and group labels (A) |
-| `colors` | `c("navy","white","firebrick")` | all | colour scale from `-clip` to `+clip`: a vector of 2 or more colours, or `"pheatmap"` (default palette of `pheatmap`, `RdYlBu` reversed), or a RColorBrewer name (`"RdBu"`, `"rev_Spectral"` = reversed) |
+| `colors` | `c("navy","white","firebrick")` | all | colour scale from `-clip` to `+clip`: a vector of 2 or more colours, or `"pheatmap"` (default palette of `pheatmap`, `RdYlBu` reversed), or `"dotplot"` (grey, cream, orange, dark red), or a RColorBrewer name (`"RdBu"`, `"rev_Spectral"` = reversed) |
+| `color_range` | `NULL` | all | `NULL`: colours over `[-clip, clip]`; `c(min, max)`, e.g. `c(-1, 3)`: colours over that range (asymmetric); keep `clip` >= max |
+| `row_h` | `8` | D | height of one row, in mm (when `flexible = FALSE`) |
+| `dot_scale` | `0.9` | D | diameter of the largest dot (100% of cells), as a fraction of its tile |
 | `na_color` | `"grey85"` | all | colour of `NA` tiles (masked by `min_n`, or genes with no variance) |
 | `bar_color` | `"grey40"` | A, B | colour of the bar plot of expressing cells |
 | `module_tiles` | `FALSE` | all | coloured tile per module, on the left side of the first block |
