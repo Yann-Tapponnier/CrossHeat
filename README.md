@@ -74,7 +74,7 @@ out2 <- run_heatmaps(datasets, genesets, params, map = out$map)  # no new g:Prof
 
 # 5. Stretching blocks, custom colours, tiles
 out3 <- run_heatmaps(datasets, genesets,
-                     list(flexible = TRUE, colors = c("royalblue", "white", "tomato"),
+                     list(flexible = TRUE, colors = "pheatmap",
                           module_tiles = TRUE, group_tiles = TRUE,
                           group_colors = c(ctrl = "grey60", treated = "firebrick")),
                      map = out$map)
@@ -137,7 +137,7 @@ Defaults are shown; also available with `default_params()` and `?default_params`
 | `col_w` | `8` | B, C | width of one column, in mm (when `flexible = FALSE`) |
 | `gene_size` | `8` | all | font size of the gene names (rows) |
 | `col_size` | `9` | all | font size of column names (B, C) and group labels (A) |
-| `colors` | `c("navy","white","firebrick")` | all | heatmap colours: low (`-clip`), middle (0), high (`+clip`); exactly 3 |
+| `colors` | `c("navy","white","firebrick")` | all | colour scale from `-clip` to `+clip`: a vector of 2 or more colours, or `"pheatmap"` (default palette of `pheatmap`, `RdYlBu` reversed), or a RColorBrewer name (`"RdBu"`, `"rev_Spectral"` = reversed) |
 | `na_color` | `"grey85"` | all | colour of `NA` tiles (masked by `min_n`, or genes with no variance) |
 | `bar_color` | `"grey40"` | A, B | colour of the bar plot of expressing cells |
 | `module_tiles` | `FALSE` | all | coloured tile per module, on the left side of the first block |

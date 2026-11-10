@@ -69,8 +69,12 @@
 #'
 #' **Colours and tiles**
 #' \describe{
-#'   \item{`colors`}{Default `c("navy", "white", "firebrick")`. Heatmap colours for
-#'     low (`-clip`), middle (0) and high (`+clip`) values. Exactly 3 colours.}
+#'   \item{`colors`}{Default `c("navy", "white", "firebrick")`. Heatmap colour scale,
+#'     from `-clip` to `+clip`. Either a vector of **2 or more** colours, spread evenly
+#'     over the scale (with an odd number the middle colour is at 0); or a single
+#'     word: `"pheatmap"` (the default palette of `pheatmap`, i.e. `RdYlBu` reversed,
+#'     7 colours), or the name of a RColorBrewer palette such as `"RdBu"`, with
+#'     `"rev_"` in front to reverse it (`"rev_Spectral"`).}
 #'   \item{`na_color`}{Default `"grey85"`. Colour of the `NA` tiles (masked by `min_n`,
 #'     or genes with no variance).}
 #'   \item{`bar_color`}{Default `"grey40"`. Colour of the bar plot of expressing cells.}
@@ -313,13 +317,29 @@ module_score <- function(zmat, d, map) {
   s
 }
 
-# échelle de couleur : bas / milieu (0) / haut
+# palette à partir d'un nom : "pheatmap" ou nom RColorBrewer ("rev_" devant = inversée)
+#' @noRd
+palette_colors <- function(name) {
+  if (identical(name, "pheatmap"))                 # défaut de pheatmap::pheatmap()
+    return(rev(RColorBrewer::brewer.pal(7, "RdYlBu")))
+  nm  <- sub("^rev_", "", name)
+  pal <- tryCatch(RColorBrewer::brewer.pal(7, nm),
+                  error = function(e)
+                    stop("`colors`: a single value must be \"pheatmap\" or a RColorBrewer palette ",
+                         "name (e.g. \"RdBu\", \"rev_Spectral\"); got \"", name, "\". ",
+                         "For your own colours give a vector of at least 2."))
+  if (startsWith(name, "rev_")) rev(pal) else pal
+}
+
+# échelle de couleur : n couleurs réparties de façon régulière entre -clip et +clip
+# (3 couleurs : bas / milieu = 0 / haut)
 #' @noRd
 make_col_fun <- function(clip, colors = c("navy", "white", "firebrick")) {
-  if (length(colors) != 3)
-    stop("`colors` needs exactly 3 colours: low, middle (0), high. Got ", length(colors))
+  if (length(colors) == 1) colors <- palette_colors(colors)
+  if (length(colors) < 2)
+    stop("`colors` needs at least 2 colours (or \"pheatmap\" / a RColorBrewer name)")
   lim <- if (is.null(clip)) 2 else clip
-  colorRamp2(c(-lim, 0, lim), colors)
+  colorRamp2(seq(-lim, lim, length.out = length(colors)), colors)
 }
 
 # couleurs nommées pour les tiles : automatiques, surchargées par `user` (vecteur nommé)
@@ -525,7 +545,7 @@ build <- function(extract, transform, datasets, map, P, version_label,
 #' # Change a few parameters
 #' out <- run_heatmaps(datasets, genesets,
 #'                     params = list(versions = c("A", "C"), clip = 3, gene_size = 6,
-#'                                   flexible = TRUE, colors = c("blue", "white", "red"),
+#'                                   flexible = TRUE, colors = "pheatmap",
 #'                                   module_tiles = TRUE, group_tiles = TRUE))
 #'
 #' # Re-run with other settings without recomputing the orthologs

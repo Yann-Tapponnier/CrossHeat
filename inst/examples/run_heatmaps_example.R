@@ -49,6 +49,13 @@ params <- list(
   human_to_mouse = TRUE,                # TRUE : genesets en symboles humains ; FALSE : en symboles souris
   map_file       = NULL,                # ex. "map_orthologues.rds" pour sauvegarder la table ; NULL = non
 
+  # ---- Gènes manquants --------------------------------------------------------
+  keep_missing   = FALSE,               # FALSE : seuls les gènes présents dans TOUS les datasets sont tracés
+                                        # TRUE  : tous les gènes sont gardés ; si un gène manque dans un
+                                        #   dataset (ou n'a pas d'ortholog), sa ligne est toute grise (na_color)
+                                        #   et son barplot vaut 0. Les gènes concernés sont listés dans la console.
+                                        #   Si tu changes keep_missing, ne réutilise PAS out$map.
+
   # ---- Transformation ---------------------------------------------------------
   clip           = 2,                   # écrêtage du z-score à [-clip, clip] ; NULL = aucun
                                         #   (fixe aussi les bornes de l'échelle de couleur)
@@ -72,7 +79,10 @@ params <- list(
                                         #   et des labels de groupes (A)
 
   # ---- Couleurs et tiles ------------------------------------------------------
-  colors         = c("navy", "white", "firebrick"),  # heatmap : bas (-clip), milieu (0), haut (+clip) ; 3 couleurs
+  colors         = c("navy", "white", "firebrick"),  # échelle de -clip à +clip : 2 couleurs ou plus, réparties
+                                        #   régulièrement (nb impair : couleur du milieu = 0). Ou un seul mot :
+                                        #   "pheatmap" (défaut de pheatmap = RdYlBu inversée, 7 couleurs),
+                                        #   ou un nom RColorBrewer ("RdBu", "rev_Spectral" = inversée)
   na_color       = "grey85",            # couleur des cases NA (masquées par min_n, ou gène sans variance)
   bar_color      = "grey40",            # couleur du barplot "cells expr."
   module_tiles   = FALSE,               # TRUE : tile coloré par module, sur le côté gauche du 1er bloc
@@ -107,10 +117,15 @@ out2 <- run_heatmaps(datasets, genesets,
                      map = out$map)
 # Si tu changes `genesets` ou `datasets`, ne pas réutiliser out$map.
 
+# Garder TOUS les gènes (lignes grises là où un gène manque) ; min_n = 0 pour ne masquer aucune case.
+# Pas de `map = out$map` ici : la table de gènes doit être recalculée.
+out_all <- run_heatmaps(datasets, genesets,
+                        modifyList(params, list(keep_missing = TRUE, min_n = 0)))
+
 # Blocs qui s'étirent + couleurs perso + tiles :
 out3 <- run_heatmaps(datasets, genesets,
                      modifyList(params, list(flexible = TRUE,
-                                             colors = c("royalblue", "white", "tomato"),
+                                             colors = "pheatmap",
                                              module_tiles = TRUE, group_tiles = TRUE)),
                      map = out$map)
 
