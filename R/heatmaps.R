@@ -8,11 +8,9 @@
 #' **Views**
 #' \describe{
 #'   \item{`versions`}{Default `c("A", "B", "C")`. Views to draw, any combination:
-#'     `"A"` genes x cells, `"B"` genes x groups, `"C"` modules x groups,
-#'     `"D"` dot plot (genes x groups, colour = scaled mean, size = fraction of
-#'     cells expressing the gene).}
+#'     `"A"` genes x cells, `"B"` genes x groups, `"C"` modules x groups.}
 #' }
-#'
+#' 
 #' **Orthologs** (used only when the datasets are of different species and `map`
 #' is not supplied to [run_heatmaps()]; if all datasets have the same species no
 #' conversion is done)
@@ -52,18 +50,6 @@
 #'   \item{`seed`}{Default `1`. Random seed of the sampling.}
 #' }
 #'
-#' **View D (dot plot)**
-#'
-#' Colour = per-gene z-score of the group mean (as in view B); dot size = fraction of the
-#' cells of the group that express the gene (0 to 1). `min_n` (set it to 0 to draw every
-#' dot), `clip`, `colors`, `color_range`, `col_w`, `gene_size`, `col_size`, `module_tiles`
-#' and `group_tiles` also apply; `show_n` is ignored.
-#' \describe{
-#'   \item{`row_h`}{Default `8`. Height of one row in mm (when `flexible = FALSE`).}
-#'   \item{`dot_scale`}{Default `0.9`. Diameter of the largest dot (100 percent of the
-#'     cells), as a fraction of the smaller side of its tile.}
-#' }
-#'
 #' **Layout and text**
 #' \describe{
 #'   \item{`flexible`}{Default `FALSE`. `TRUE`: the blocks stretch with the plot window
@@ -88,11 +74,7 @@
 #'     over the scale (with an odd number the middle colour is at 0); or a single
 #'     word: `"pheatmap"` (the default palette of `pheatmap`, i.e. `RdYlBu` reversed,
 #'     7 colours), or the name of a RColorBrewer palette such as `"RdBu"`, with
-#'     `"rev_"` in front to reverse it (`"rev_Spectral"`); or `"dotplot"` (grey, cream,
-#'     orange, dark red; made for view D with `color_range = c(-1, 3)`).}
-#'   \item{`color_range`}{Default `NULL`: the colours are spread over `[-clip, clip]`.
-#'     `c(min, max)`, e.g. `c(-1, 3)`: they are spread over that range instead
-#'     (asymmetric scale). Use with `clip` >= `max`.}
+#'     `"rev_"` in front to reverse it (`"rev_Spectral"`).}
 #'   \item{`na_color`}{Default `"grey85"`. Colour of the `NA` tiles (masked by `min_n`,
 #'     or genes with no variance).}
 #'   \item{`bar_color`}{Default `"grey40"`. Colour of the bar plot of expressing cells.}
@@ -144,8 +126,7 @@ default_params <- function() list(
   gene_size      = 8,                 # taille de police des noms de gènes (lignes)
   col_size       = 9,                 # taille de police des noms de colonnes / groupes
   # couleurs et tiles
-  colors         = c("navy", "white", "firebrick"),  # 2 couleurs ou plus, ou "pheatmap", "dotplot", nom RColorBrewer
-  color_range    = NULL,              # NULL : échelle de -clip à +clip ; ou c(min, max), ex. c(-1, 3)
+  colors         = c("navy", "white", "firebrick"),  # bas, milieu (0), haut
   na_color       = "grey85",
   bar_color      = "grey40",
   module_tiles   = FALSE,             # tile coloré par module, sur le côté
@@ -153,9 +134,6 @@ default_params <- function() list(
   module_colors  = NULL,              # vecteur nommé, ex. c(Module1 = "red"); NULL = auto
   group_colors   = NULL,              # vecteur nommé, ex. c(ctrl = "grey"); NULL = auto
   tile_size      = 3,                 # épaisseur des tiles (mm)
-  # vue D (dot plot)
-  row_h          = 8,                 # hauteur d'une ligne en mm (si flexible = FALSE)
-  dot_scale      = 0.9,               # diamètre max du point, en fraction de la case
   # PNG
   save_png       = FALSE,
   out_dir        = ".",
@@ -313,10 +291,7 @@ extract_avg <- function(d, map, min_n = 10) {
 
   avg[n_expr < min_n] <- NA          # trop peu de cellules positives -> case grise
 
-  # proportion de cellules du groupe qui expriment le gène (vue D : taille du point)
-  prop <- sweep(n_expr, 2, lengths(idx), "/")
-
-  list(mat = avg, group = NULL, n_expr = n_expr, n_total = n_total, prop = prop)
+  list(mat = avg, group = NULL, n_expr = n_expr, n_total = n_total)
 }
 
 ###############################################################################
@@ -347,8 +322,6 @@ module_score <- function(zmat, d, map) {
 palette_colors <- function(name) {
   if (identical(name, "pheatmap"))                 # défaut de pheatmap::pheatmap()
     return(rev(RColorBrewer::brewer.pal(7, "RdYlBu")))
-  if (identical(name, "dotplot"))                  # gris -> crème -> orange -> rouge foncé
-    return(c("#E5E5E5", "#FEF0D0", "#FDBE7A", "#E1522F", "#A50F15"))
   nm  <- sub("^rev_", "", name)
   pal <- tryCatch(RColorBrewer::brewer.pal(7, nm),
                   error = function(e)
@@ -361,16 +334,12 @@ palette_colors <- function(name) {
 # échelle de couleur : n couleurs réparties de façon régulière entre -clip et +clip
 # (3 couleurs : bas / milieu = 0 / haut)
 #' @noRd
-make_col_fun <- function(clip, colors = c("navy", "white", "firebrick"), range = NULL) {
+make_col_fun <- function(clip, colors = c("navy", "white", "firebrick")) {
   if (length(colors) == 1) colors <- palette_colors(colors)
   if (length(colors) < 2)
-    stop("`colors` needs at least 2 colours (or \"pheatmap\" / \"dotplot\" / a RColorBrewer name)")
-  if (!is.null(range) && (length(range) != 2 || range[1] >= range[2]))
-    stop("`color_range` must be c(min, max) with min < max, e.g. c(-1, 3)")
-  lim  <- if (is.null(clip)) 2 else clip
-  brks <- if (is.null(range)) seq(-lim, lim, length.out = length(colors))
-          else seq(range[1], range[2], length.out = length(colors))
-  colorRamp2(brks, colors)
+    stop("`colors` needs at least 2 colours (or \"pheatmap\" / a RColorBrewer name)")
+  lim <- if (is.null(clip)) 2 else clip
+  colorRamp2(seq(-lim, lim, length.out = length(colors)), colors)
 }
 
 # couleurs nommées pour les tiles : automatiques, surchargées par `user` (vecteur nommé)
@@ -397,10 +366,10 @@ resolve_colors <- function(values, user = NULL, palette = "Set 3") {
 #' @noRd
 plot_block <- function(mat, title, map, col_fun, P, first = TRUE, by_gene = TRUE,
                        col_group = NULL, n_total = NULL,
-                       group_cols = NULL, module_cols = NULL, prop = NULL) {
+                       group_cols = NULL, module_cols = NULL) {
   # --- barplot du nb de cellules exprimant le gène (à droite)
   ra <- NULL
-  if (by_gene && P$show_n && !is.null(n_total) && is.null(prop)) {
+  if (by_gene && P$show_n && !is.null(n_total)) {
     args <- list(anno_barplot(n_total, which = "row", width = unit(15, "mm"),
                               gp = gpar(fill = P$bar_color, col = NA)),
                  annotation_label = "cells\nexpr.")
@@ -457,24 +426,6 @@ plot_block <- function(mat, title, map, col_fun, P, first = TRUE, by_gene = TRUE
     if (is.null(col_group)) unit(ncol(mat) * P$col_w, "mm") else unit(60, "mm")
   }
 
-  # --- vue D (dot plot) : un point par case, rayon proportionnel à la fraction de cellules
-  dot <- !is.null(prop)
-  h <- NULL
-  cell_fun <- NULL
-  if (dot) {
-    if (!isTRUE(P$flexible)) {
-      nsl <- if (by_gene) length(unique(map$module)) else 1
-      w <- unit(ncol(mat) * P$col_w, "mm")
-      h <- unit(nrow(mat) * P$row_h + (nsl - 1) * 4, "mm")   # 4 mm = row_gap
-    }
-    cell_fun <- function(j, i, x, y, width, height, fill) {
-      v <- mat[i, j]; p <- prop[i, j]
-      if (is.na(v) || is.na(p)) return(invisible(NULL))
-      grid.circle(x, y, r = 0.5 * P$dot_scale * p * min(unit.c(width, height)),
-                  gp = gpar(fill = col_fun(v), col = NA))
-    }
-  }
-
   Heatmap(mat, name = "z-score", col = col_fun, na_col = P$na_color,
           cluster_rows = FALSE, cluster_columns = FALSE,
           row_split    = if (by_gene) map$module else NULL,
@@ -484,14 +435,12 @@ plot_block <- function(mat, title, map, col_fun, P, first = TRUE, by_gene = TRUE
           show_column_names = is.null(col_group),
           row_names_side = "left", row_names_gp = gpar(fontsize = P$gene_size),
           column_names_gp = gpar(fontsize = P$col_size),
-          column_title = title, border = !dot,
+          column_title = title, border = TRUE,
           left_annotation   = la,
           right_annotation  = ra,
           top_annotation    = ta,
           bottom_annotation = ba,
-          width = w, height = h,
-          rect_gp  = if (dot) gpar(type = "none") else gpar(col = NA),
-          cell_fun = cell_fun)
+          width = w)
 }
 
 ###############################################################################
@@ -499,8 +448,8 @@ plot_block <- function(mat, title, map, col_fun, P, first = TRUE, by_gene = TRUE
 ###############################################################################
 #' @noRd
 build <- function(extract, transform, datasets, map, P, version_label,
-                  by_gene = TRUE, use_group = FALSE, dots = FALSE, file = NULL, ...) {
-  col_fun <- make_col_fun(P$clip, P$colors, P$color_range)
+                  by_gene = TRUE, use_group = FALSE, file = NULL, ...) {
+  col_fun <- make_col_fun(P$clip, P$colors)
   res <- lapply(datasets, \(d) { e <- extract(d, map, ...); list(e = e, z = transform(e$mat, d)) })
 
   # couleurs de tiles communes à tous les blocs (même nom = même couleur)
@@ -516,29 +465,16 @@ build <- function(extract, transform, datasets, map, P, version_label,
                            col_group   = if (use_group) res[[i]]$e$group else NULL,
                            n_total     = res[[i]]$e$n_total,
                            group_cols  = group_cols,
-                           module_cols = module_cols,
-                           prop        = if (dots) res[[i]]$e$prop else NULL))
+                           module_cols = module_cols))
   ht <- Reduce(`+`, hts)
 
   main <- P$title
   if (!is.null(main) && P$title_version) main <- paste0(main, " - ", version_label)
 
-  # vue D : légende des tailles de point
-  legends <- list()
-  if (dots) {
-    d_max <- min(P$col_w, P$row_h) * P$dot_scale          # diamètre max, en mm
-    sizes <- c(0, 0.25, 0.5, 0.75, 1)
-    legends <- list(Legend(title = "Prop.\nExpr.", labels = sprintf("%.2f", sizes),
-                           type = "points", pch = 16,
-                           size = unit(pmax(sizes * d_max, 0.3), "mm"),
-                           legend_gp = gpar(col = "black"), background = NA))
-  }
-
   draw_it <- function()
     draw(ht, ht_gap = unit(5, "mm"),
          column_title = main,
-         column_title_gp = gpar(fontsize = P$title_size, fontface = "bold"),
-         annotation_legend_list = legends)
+         column_title_gp = gpar(fontsize = P$title_size, fontface = "bold"))
 
   draw_it()
   if (!is.null(file)) {
@@ -571,9 +507,7 @@ build <- function(extract, transform, datasets, map, P, version_label,
 #'   \item **A** genes x cells (random sample of cells per group),
 #'   \item **B** genes x groups (average expression, with a mask for groups where
 #'     fewer than `min_n` cells express the gene),
-#'   \item **C** modules x groups (mean z-score per module),
-#'   \item **D** dot plot: genes x groups, colour = scaled mean, dot size = fraction
-#'     of the cells of the group that express the gene.
+#'   \item **C** modules x groups (mean z-score per module).
 #' }
 #'
 #' @param datasets Named list. Each element is a list with `obj` (Seurat object,
@@ -624,11 +558,6 @@ build <- function(extract, transform, datasets, map, P, version_label,
 #' out3 <- run_heatmaps(datasets, genesets,
 #'                      params = list(keep_missing = TRUE, min_n = 0))
 #'
-#' # Dot plot (view D); min_n = 0 draws every dot
-#' run_heatmaps(datasets, genesets,
-#'              list(versions = "D", colors = "dotplot", color_range = c(-1, 3),
-#'                   clip = 3, min_n = 0))
-#'
 #' # One species only (here a single mouse dataset): no ortholog conversion,
 #' # genesets are MOUSE symbols
 #' run_heatmaps(list(Dataset2_mouse = datasets$Dataset2_mouse),
@@ -658,10 +587,7 @@ run_heatmaps <- function(datasets, genesets, params = list(), map = NULL) {
     C = build(extract_avg, \(m, d) module_score(zrow(m, P$clip), d, map), datasets, map, P,
               "C: modules x groups", by_gene = FALSE, file = png_file("C"),
               min_n = P$min_n),
-    D = build(extract_avg, \(m, d) zrow(m, P$clip), datasets, map, P,
-              "D: dot plot", dots = TRUE, file = png_file("D"),
-              min_n = P$min_n),
-    stop("Unknown version: ", v, " (choose among A, B, C, D)"))
+    stop("Unknown version: ", v, " (choose among A, B, C)"))
 
   res <- setNames(lapply(P$versions, one), P$versions)
   invisible(list(map = map, res = res))
